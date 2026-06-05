@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ku">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سیستەمی فرۆشتنی کوردی</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body{font-family:Arial;background:#eef2f7;margin:0;}
+
+.header{
+  background:#1976d2;
+  color:#fff;
+  padding:10px;
+  text-align:center;
+}
+
+.box{padding:10px;}
+
+.card{
+  background:#fff;
+  padding:10px;
+  margin:8px 0;
+  border-radius:10px;
+}
+
+button{
+  width:100%;
+  padding:7px;
+  margin-top:5px;
+  background:#1976d2;
+  color:#fff;
+  border:none;
+  border-radius:6px;
+}
+
+input{
+  width:100%;
+  padding:8px;
+  margin:5px 0;
+}
+
+.footer{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  background:#fff;
+  padding:4px;
+  text-align:center;
+  font-size:12px;
+  box-shadow:0 -1px 5px rgba(0,0,0,0.1);
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">🏪 سیستەمی فرۆشتنی کوردی</div>
+
+<div class="box">
+
+<h3>📦 زیادکردنی کاڵا</h3>
+
+<input id="pname" placeholder="ناوی کاڵا">
+<input id="pprice" placeholder="نرخ">
+<input id="pstock" placeholder="کۆگا">
+
+<button onclick="addProduct()">زیادکردن</button>
+
+<hr>
+
+<h3>📦 کاڵاکان</h3>
+<div id="plist"></div>
+
+<hr>
+
+<h3>🛒 سەبەتە</h3>
+
+<input id="customer" placeholder="ناوی کڕیار">
+
+<div id="cartBox"></div>
+
+<button onclick="sell()">💰 فرۆشتن</button>
+<button onclick="generatePDF()">📄 PDF فاکتۆر</button>
+
+</div>
+
+<!-- TOTAL -->
+<div class="footer">
+💰 کۆی گشتی:
+<span id="total">0</span> $
+</div>
+
+<script>
+
+let products = JSON.parse(localStorage.getItem("products") || "[]");
+let cart = [];
+
+/* ADD PRODUCT */
+function addProduct(){
+
+  let name = pname.value;
+  let price = Number(pprice.value);
+  let stock = Number(pstock.value);
+
+  products.push({name,price,stock});
+
+  localStorage.setItem("products",JSON.stringify(products));
+
+  pname.value="";
+  pprice.value="";
+  pstock.value="";
+
+  render();
+}
+
+/* DELETE */
+function deleteProduct(i){
+  products.splice(i,1);
+  localStorage.setItem("products",JSON.stringify(products));
+  render();
+}
+
+/* ADD TO CART */
+function addToCart(i){
+
+  let p = products[i];
+
+  let item = cart.find(x=>x.name==p.name);
+
+  if(item) item.qty++;
+  else cart.push({name:p.name,price:p.price,qty:1});
+
+  renderCart();
+}
+
+function plus(i){cart[i].qty++;renderCart();}
+function minus(i){cart[i].qty--;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
+
+/* RENDER */
+function render(){
+
+  plist.innerHTML="";
+
+  products.forEach((p,i)=>{
+
+    plist.innerHTML+=`
+      <div class="card">
+        🛒 ${p.name}<br>
+        💰 ${p.price}$<br>
+        📦 ${p.stock}
+
+        <button onclick="addToCart(${i})">زیادکردن</button>
+        <button style="background:red" onclick="deleteProduct(${i})">سڕینەوە</button>
+      </div>
+    `;
+  });
+
+  renderCart();
+}
+
+/* CART */
+function renderCart(){
+
+  cartBox.innerHTML="";
+
+  let total=0;
+
+  cart.forEach((c,i)=>{
+
+    let t=c.price*c.qty;
+    total+=t;
+
+    cartBox.innerHTML+=`
+      <div class="card">
+        ${c.name}<br>
+        ژمارە: ${c.qty}<br>
+        کۆ: ${t}$
+
+        <button onclick="plus(${i})">+</button>
+        <button onclick="minus(${i})">-</button>
+      </div>
+    `;
+  });
+
+  document.getElementById("total").innerText=total.toFixed(2);
+}
+
+/* SELL */
+function sell(){
+
+  if(cart.length==0){
+    alert("سەبەتە خالیە");
+    return;
+  }
+
+  cart.forEach(i=>{
+    let p = products.find(x=>x.name==i.name);
+    if(p){
+      p.stock -= i.qty;
+      if(p.stock<0) p.stock=0;
+    }
+  });
+
+  localStorage.setItem("products",JSON.stringify(products));
+
+  alert("✔ فرۆشتن تەواو بوو");
+
+  cart = [];
+  render();
+  renderCart();
+}
+
+/* PDF */
+function generatePDF(){
+
+  if(cart.length==0){
+    alert("سەبەتە خالیە");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  let y=10;
+  let total=0;
+
+  let customer = document.getElementById("customer").value || "کڕیاری ئاسایی";
+  let now = new Date().toLocaleString();
+
+  doc.text("🏪 فاکتۆری فرۆشتن",10,y);y+=10;
+
+  doc.text("👤 کڕیار: "+customer,10,y);y+=10;
+
+  doc.text("📅 کات: "+now,10,y);y+=10;
+
+  doc.text("----------------------",10,y);y+=10;
+
+  cart.forEach(i=>{
+    doc.text(`${i.name} x${i.qty} = ${i.price*i.qty}$`,10,y);
+    y+=8;
+    total+=i.price*i.qty;
+  });
+
+  y+=10;
+
+  doc.text("----------------------",10,y);y+=10;
+
+  doc.text("کۆی گشتی: "+total+"$",10,y);
+
+  doc.save("invoice.pdf");
+}
+
+render();
+
+</script>
+
+</body>
+</html>
